@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: po_postgres
+    environment:
+      POSTGRES_DB: po_management
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./schema_and_seed.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U po_user -d po_management"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: po_backend
+    environment:
+      DATABASE_URL: postgresql://postgres:root@db:5432/po_management
+      JWT_SECRET_KEY: change-this-in-production-use-a-long-random-string
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./frontend:/frontend
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pg_data:
